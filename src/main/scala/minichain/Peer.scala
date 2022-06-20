@@ -2,14 +2,14 @@ package minichain
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, PreRestart}
-import minichain.MemPool.{ApplyTxsToPool, Transaction, TxsAppliedToPool}
+import minichain.MemPool.{ApplyTxsToPool, TxsAppliedToPool}
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration.DurationInt
 
 /** Peer receives txs from other peers for demonstration purposes, it does not transmit txs to them */
 object Peer {
-  def apply(memPool: ActorRef[ApplyTxsToPool]): Behavior[TxsAppliedToPool] =
+  def behavior(memPool: ActorRef[ApplyTxsToPool]): Behavior[TxsAppliedToPool] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
         timers.startSingleTimer(TxsAppliedToPool(ArraySeq.empty), 1.second)
