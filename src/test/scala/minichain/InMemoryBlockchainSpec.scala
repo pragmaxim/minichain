@@ -138,7 +138,7 @@ class InMemoryBlockchainSpec extends AnyFlatSpec with Matchers {
         Transaction(50L, "Alice", "Tom"),
         Transaction(50L, "Unknown", "Tom")
       )
-    val (TxsAppliedToState(valid, invalid), newBlockChain) = InMemoryBlockchain.fromGenesis.applyTxsToUtxoState(validTxs ++ invalidTxs, Miner.verifiedGenesisBlock.hash)
+    val (TxsAppliedToState(valid, invalid, _, _), newBlockChain) = InMemoryBlockchain.fromGenesis.applyTxsToUtxoState(validTxs ++ invalidTxs)
     newBlockChain.utxoStateByHash shouldBe Map(Miner.verifiedGenesisBlock.hash -> Map("Bob" -> 99999950, "Alice" -> 0, "Tom" -> 50))
     valid shouldBe validTxs
     invalid shouldBe invalidTxs

@@ -10,11 +10,11 @@ object Launcher extends App {
 
   val guardian: Behavior[Nothing] =
     Behaviors.setup[Nothing] { ctx =>
+      implicit val system: ActorSystem[Nothing] = ctx.system
       val blockchainRef = ctx.spawn(Blockchain.behavior(InMemoryBlockchain.fromGenesis), "Blockchain")
       val memPoolRef = ctx.spawn(MemPool.behavior(), "MemPool")
-      ctx.spawn(Miner.behavior(blockchainRef, memPoolRef), "Miner")
 
-      Demo.run(memPoolRef)(ctx.system)
+      Miner.stream(blockchainRef, memPoolRef).run().zip(Demo.run(memPoolRef))
       Behaviors.unhandled
     }
 

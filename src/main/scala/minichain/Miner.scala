@@ -1,7 +1,11 @@
 package minichain
 
-import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors, TimerScheduler}
-import akka.actor.typed.{ActorRef, Behavior, PreRestart}
+import akka.actor.Cancellable
+import akka.actor.typed.scaladsl.AskPattern._
+import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.stream.scaladsl.Source
+import akka.util.Timeout
+import com.typesafe.scalalogging.LazyLogging
 import minichain.Blockchain._
 import minichain.MemPool.{PoolTxs, PullPoolTxs}
 
@@ -10,41 +14,23 @@ import scala.concurrent.duration._
 
 /** Miner is pulling txs from mempool and applies them to UtxoState, valid/verified txs are then used to mine a block
  * which is passed to blockchain */
-class Miner(ctx: ActorContext[Response], timers: TimerScheduler[Response], memPool: ActorRef[PullPoolTxs], blockchain: ActorRef[ChainRequest]) extends AbstractBehavior[Response](ctx) {
+object Miner extends LazyLogging {
 
-  timers.startSingleTimer(PoolTxs(ArraySeq.empty), 5.second)
-
-  def behavior(index: Int, parentHash: Hash): Behavior[Response] =
-    Behaviors.receiveMessage[Response] {
-      case PoolTxs(txs) =>
-        if (txs.nonEmpty)
-          blockchain ! ApplyTxsToState(txs, parentHash, context.self)
-        context.scheduleOnce(5.second, memPool, PullPoolTxs(context.self))
-        Behaviors.same
-      case TxsAppliedToState(validTxs, _) if validTxs.nonEmpty =>
-        val newBlock = Miner.mineNextBlock(index, parentHash, Transactions(validTxs), Miner.StdMiningTargetNumber)
-        ctx.log.info(s"Mined new block of ${validTxs.length} txs : ${newBlock.hash}")
-        blockchain ! ApplyBlockToChain(newBlock, context.self)
-        behavior(index + 1, newBlock.hash)
-      case BlockAppliedToChain(_, _) =>
-        Behaviors.same
-    }.receiveSignal {
-      case (_, PreRestart) =>
-        ctx.log.info(s"Starting Miner ...")
-        Behaviors.same
-    }
-
-  override def onMessage(msg: Response): Behavior[Response] = Behaviors.unhandled
-}
-
-object Miner {
-
-  def behavior(blockchain: ActorRef[ChainRequest], memPool: ActorRef[PullPoolTxs]): Behavior[Response] =
-    Behaviors.setup { ctx =>
-      Behaviors.withTimers { timers =>
-        new Miner(ctx, timers, memPool, blockchain).behavior(1, Miner.verifiedGenesisBlock.hash)
+  def stream(blockchain: ActorRef[ChainRequest], memPool: ActorRef[PullPoolTxs])
+            (implicit system: ActorSystem[_]): Source[BlockAppliedToChain, Cancellable] = {
+    implicit val timeout: Timeout = 3.seconds
+    Source.tick(5.seconds, 3.seconds, ())
+      .mapAsync(parallelism = 1) { _ =>
+        memPool.ask(PullPoolTxs)
+      }.filter(_.txs.nonEmpty)
+      .mapAsync(parallelism = 1) { case PoolTxs(txs) =>
+        blockchain.ask(ref => ApplyTxsToState(txs, ref))
+      }.filter(_.valid.nonEmpty)
+      .mapAsync(parallelism = 1) { case TxsAppliedToState(validTxs, _, index, parentHash) =>
+        val newBlock = Miner.mineNextBlock(index + 1, parentHash, Transactions(validTxs), Miner.StdMiningTargetNumber)
+        blockchain.ask(ref => ApplyBlockToChain(newBlock, ref))
       }
-    }
+  }
 
   final val genesisTx = Transaction(100000000, "Alice", "Bob")
 
@@ -99,7 +85,7 @@ object Miner {
 
     if (currentSolution.toNumber >= miningTargetNumber)
       throw new IllegalStateException("Unable to find solution with Nonce<Long.MinValue, Long.MaxValue>")
-
+    logger.info(s"Mined new block of ${transactions.txs.length} txs : $currentSolution")
     Block(currentSolution, BlockTemplate(index, parentHash, transactions, miningTargetNumber, currentNonce))
   }
 }

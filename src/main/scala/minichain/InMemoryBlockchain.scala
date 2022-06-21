@@ -22,6 +22,9 @@ case class InMemoryBlockchain(
                                indexCache: SortedMap[Long, List[Block]],
                                hashCache: Map[Hash, BlockTemplate],
                                utxoStateByHash: Map[Hash, UtxoState]) extends BlockchainLike with LazyLogging {
+  def bestBlockHash: Hash =
+    latestBlocks.maxBy(_.template.transactions.txs.size).hash
+
   def height: Long = indexCache.last._1
 
   def isForked: Boolean = indexCache.size == hashCache.size && indexCache.forall(_._2.tails.isEmpty)
@@ -55,7 +58,7 @@ case class InMemoryBlockchain(
     }
   }
 
-  def applyTxsToUtxoState(txs: IndexedSeq[Transaction], parentHash: Hash): (TxsAppliedToState, InMemoryBlockchain) = {
+  def applyTxsToUtxoState(txs: IndexedSeq[Transaction]): (TxsAppliedToState, InMemoryBlockchain) = {
     def transfer(value: Long, input: String, output: String, utxoState: Map[String, Long]): Try[Map[String, Long]] = {
       utxoState.get(input).map {
         case existingInputValue if existingInputValue >= value =>
@@ -65,6 +68,7 @@ case class InMemoryBlockchain(
       }.getOrElse(Failure(new IllegalArgumentException(s"Input address $input does not exist")))
     }
 
+    val parentHash = bestBlockHash
     val utxoStateForHash = utxoStateByHash(parentHash)
     val printableState = utxoStateForHash.map { case (address, value) => s"$address : $value" }.mkString(", ")
     logger.info(s"Applying ${txs.length} transactions to UtxoState : $printableState")
@@ -82,7 +86,7 @@ case class InMemoryBlockchain(
           utxoStateAcc
       }
     }
-    TxsAppliedToState(validTxs.result(), invalidTxs.result()) -> copy(utxoStateByHash = utxoStateByHash.updated(parentHash, newUtxoStateForHash))
+    TxsAppliedToState(validTxs.result(), invalidTxs.result(), height, parentHash) -> copy(utxoStateByHash = utxoStateByHash.updated(parentHash, newUtxoStateForHash))
   }
 
 

@@ -11,21 +11,21 @@ import scala.util.{Failure, Success, Try}
 object Blockchain {
   sealed trait ChainRequest
 
-  case class ApplyTxsToState(txs: IndexedSeq[Transaction], parentHash: Hash, replyTo: ActorRef[TxsAppliedToState]) extends ChainRequest
+  case class ApplyTxsToState(txs: IndexedSeq[Transaction], replyTo: ActorRef[TxsAppliedToState]) extends ChainRequest
 
   case class ApplyBlockToChain(block: Block, replyTo: ActorRef[BlockAppliedToChain]) extends ChainRequest
 
   sealed trait ChainResponse extends Response
 
-  case class TxsAppliedToState(valid: IndexedSeq[Transaction], invalid: IndexedSeq[Transaction]) extends ChainResponse
+  case class TxsAppliedToState(valid: IndexedSeq[Transaction], invalid: IndexedSeq[Transaction], height: Long, parentHash: Hash) extends ChainResponse
 
   case class BlockAppliedToChain(block: Block, valid: Boolean) extends ChainResponse
 
   def behavior(state: BlockchainLike): Behavior[ChainRequest] =
     Behaviors.setup[ChainRequest] { ctx =>
       Behaviors.receiveMessage[ChainRequest] {
-        case ApplyTxsToState(txs, parentHash, replyTo) =>
-          val (appliedTxs, newUtxoState) = state.applyTxsToUtxoState(txs, parentHash)
+        case ApplyTxsToState(txs, replyTo) =>
+          val (appliedTxs, newUtxoState) = state.applyTxsToUtxoState(txs)
           replyTo ! appliedTxs
           behavior(newUtxoState)
         case ApplyBlockToChain(block, replyTo) =>
@@ -48,6 +48,9 @@ object Blockchain {
 }
 
 trait BlockchainLike {
+  /** @return hash of the latest block */
+  def bestBlockHash: Hash
+
   /** @return current height of blockchain, index of the latest block */
   def height: Long
 
@@ -67,10 +70,9 @@ trait BlockchainLike {
    * Validates and applies transactions to the UtxoState
    *
    * @param txs        to validate and apply
-   * @param parentHash is a hash of a parent block tracked by miner
    * @return Applied transactions (valid/invalid) and amended copy of BlockchainLike instance
    */
-  def applyTxsToUtxoState(txs: IndexedSeq[Transaction], parentHash: Hash): (TxsAppliedToState, BlockchainLike)
+  def applyTxsToUtxoState(txs: IndexedSeq[Transaction]): (TxsAppliedToState, BlockchainLike)
 
   /**
    * Find block(s) by index
