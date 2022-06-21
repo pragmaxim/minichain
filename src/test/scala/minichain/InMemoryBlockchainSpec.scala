@@ -1,7 +1,6 @@
 package minichain
 
 import minichain.Blockchain.TxsAppliedToState
-import minichain.MemPool.{Transaction, Transactions}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -9,15 +8,15 @@ import scala.collection.immutable.ArraySeq
 
 class InMemoryBlockchainSpec extends AnyFlatSpec with Matchers {
 
-  private def forkBlockchainWith(parentHash: Hash, atHeight: Int, bc: BlockchainLike, txs: Transactions) = {
+  private def forkBlockchainWith(parentHash: Hash, atHeight: Long, bc: BlockchainLike, txs: Transactions) = {
     (atHeight to bc.height+4).foldLeft(parentHash -> bc) { case ((newParentHash, newBc), childIdx) =>
       val newBlock = Miner.mineNextBlock(childIdx, newParentHash, txs, Miner.StdMiningTargetNumber)
       newBlock.hash -> newBc.append(newBlock).get
     }
   }
 
-  private def generateNewBlockchain(txs: Transactions, height: Int = 3) = {
-    (1 to height).foldLeft(Miner.verifiedGenesisBlock.hash -> InMemoryBlockchain.fromGenesis) { case ((parentHash, bc), idx) =>
+  private def generateNewBlockchain(txs: Transactions, height: Long = 3) = {
+    (1L to height).foldLeft(Miner.verifiedGenesisBlock.hash -> InMemoryBlockchain.fromGenesis) { case ((parentHash, bc), idx) =>
       val newBlock = Miner.mineNextBlock(idx, parentHash, txs, Miner.StdMiningTargetNumber)
       newBlock.hash -> bc.append(newBlock).get
     }
@@ -44,7 +43,7 @@ class InMemoryBlockchainSpec extends AnyFlatSpec with Matchers {
 
     val validBlock = Miner.mineNextBlock(1, Miner.verifiedGenesisBlock.hash, Transactions(ArraySeq(Transaction(100, "Alice", "Bob"))), Miner.StdMiningTargetNumber)
     val invalidIndexBlock = Miner.mineNextBlock(256, Miner.verifiedGenesisBlock.hash, Transactions(ArraySeq(Transaction(100, "Alice", "Bob"))), Miner.StdMiningTargetNumber)
-    val orphanBlock = Miner.mineNextBlock(1, Sha256("Alice".getBytes("UTF-8")), Transactions(ArraySeq(Transaction(100, "Alice", "Bob"))), Miner.StdMiningTargetNumber)
+    val orphanBlock = Miner.mineNextBlock(1, Hash.sha256("Alice".getBytes("UTF-8")), Transactions(ArraySeq(Transaction(100, "Alice", "Bob"))), Miner.StdMiningTargetNumber)
     val invalidTxsBlock = Miner.mineNextBlock(1, Miner.verifiedGenesisBlock.hash, Transactions(ArraySeq.empty), Miner.StdMiningTargetNumber)
 
     bcWithGenesisOnly.append(validBlock).isSuccess shouldBe true

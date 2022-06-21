@@ -8,11 +8,11 @@ import scala.collection.mutable
 
 /** Mempool receives txs from peers and wallet and provides them to miner for mining a block */
 object MemPool {
-  sealed trait PoolApplyEvent
+  sealed trait PoolRequest
 
-  case class PullPoolTxs(replyTo: ActorRef[PoolTxs]) extends PoolApplyEvent
+  case class PullPoolTxs(replyTo: ActorRef[PoolTxs]) extends PoolRequest
 
-  case class ApplyTxsToPool(txs: IndexedSeq[Transaction], replyTo: ActorRef[TxsAppliedToPool]) extends PoolApplyEvent
+  case class ApplyTxsToPool(txs: IndexedSeq[Transaction], replyTo: ActorRef[TxsAppliedToPool]) extends PoolRequest
 
   sealed trait PoolResponse extends Response
 
@@ -20,9 +20,9 @@ object MemPool {
 
   case class TxsAppliedToPool(txs: IndexedSeq[Transaction]) extends PoolResponse
 
-  def behavior(txs: mutable.ArrayBuilder[Transaction] = mutable.ArrayBuilder.make): Behavior[PoolApplyEvent] =
-    Behaviors.setup[PoolApplyEvent] { ctx =>
-      Behaviors.receiveMessage[PoolApplyEvent] {
+  def behavior(txs: mutable.ArrayBuilder[Transaction] = mutable.ArrayBuilder.make): Behavior[PoolRequest] =
+    Behaviors.setup[PoolRequest] { ctx =>
+      Behaviors.receiveMessage[PoolRequest] {
         case PullPoolTxs(replyTo) =>
           replyTo ! PoolTxs(ArraySeq.unsafeWrapArray(txs.result()))
           Behaviors.same

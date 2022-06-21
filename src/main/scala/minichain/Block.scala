@@ -63,7 +63,7 @@ case class Block(hash: Hash, template: BlockTemplate)
 
 /** Hashing BlockTemplate with the right nonce gives us hash bellow target mining number */
 case class BlockTemplate(
-                          index: Int, // should not be Int in case our blockchain is going to be successful :-)
+                          index: Long,
                           parentHash: Hash,
                           transactions: Transactions,
                           miningTargetNumber: HashNumber,
@@ -80,7 +80,7 @@ object BlockTemplate {
 
   /** Hash properties of a BlockTemplate with Sha-256 */
   def cryptoHash(
-                  index: Int,
+                  index: Long,
                   parentHash: Hash,
                   transactions: Transactions,
                   miningTargetNumber: BigInt,

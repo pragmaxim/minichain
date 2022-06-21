@@ -10,7 +10,7 @@ import scala.concurrent.duration._
 
 /** Miner is pulling txs from mempool and applies them to UtxoState, valid/verified txs are then used to mine a block
  * which is passed to blockchain */
-class Miner(ctx: ActorContext[Response], timers: TimerScheduler[Response], memPool: ActorRef[PullPoolTxs], blockchain: ActorRef[ChainApplyEvent]) extends AbstractBehavior[Response](ctx) {
+class Miner(ctx: ActorContext[Response], timers: TimerScheduler[Response], memPool: ActorRef[PullPoolTxs], blockchain: ActorRef[ChainRequest]) extends AbstractBehavior[Response](ctx) {
 
   timers.startSingleTimer(PoolTxs(ArraySeq.empty), 5.second)
 
@@ -39,7 +39,7 @@ class Miner(ctx: ActorContext[Response], timers: TimerScheduler[Response], memPo
 
 object Miner {
 
-  def behavior(blockchain: ActorRef[ChainApplyEvent], memPool: ActorRef[PullPoolTxs]): Behavior[Response] =
+  def behavior(blockchain: ActorRef[ChainRequest], memPool: ActorRef[PullPoolTxs]): Behavior[Response] =
     Behaviors.setup { ctx =>
       Behaviors.withTimers { timers =>
         new Miner(ctx, timers, memPool, blockchain).behavior(1, Miner.verifiedGenesisBlock.hash)
@@ -85,7 +85,7 @@ object Miner {
 
   /** Hash BlockTemplate with an increasing nonce until we get a hash number that is lower than mining target number */
   def mineNextBlock(
-                     index: Int,
+                     index: Long,
                      parentHash: Hash,
                      transactions: Transactions,
                      miningTargetNumber: BigInt,

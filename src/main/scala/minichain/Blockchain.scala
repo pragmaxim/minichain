@@ -9,11 +9,11 @@ import scala.util.{Failure, Success, Try}
 /** Blockchain actor verifies/validates transaction by trying to apply them to UtxoState,
  * returns valid txs to the Miner which mines a blocks and asks for applying it to the blockchain */
 object Blockchain {
-  sealed trait ChainApplyEvent
+  sealed trait ChainRequest
 
-  case class ApplyTxsToState(txs: IndexedSeq[Transaction], parentHash: Hash, replyTo: ActorRef[TxsAppliedToState]) extends ChainApplyEvent
+  case class ApplyTxsToState(txs: IndexedSeq[Transaction], parentHash: Hash, replyTo: ActorRef[TxsAppliedToState]) extends ChainRequest
 
-  case class ApplyBlockToChain(block: Block, replyTo: ActorRef[BlockAppliedToChain]) extends ChainApplyEvent
+  case class ApplyBlockToChain(block: Block, replyTo: ActorRef[BlockAppliedToChain]) extends ChainRequest
 
   sealed trait ChainResponse extends Response
 
@@ -21,9 +21,9 @@ object Blockchain {
 
   case class BlockAppliedToChain(block: Block, valid: Boolean) extends ChainResponse
 
-  def behavior(state: BlockchainLike): Behavior[ChainApplyEvent] =
-    Behaviors.setup[ChainApplyEvent] { ctx =>
-      Behaviors.receiveMessage[ChainApplyEvent] {
+  def behavior(state: BlockchainLike): Behavior[ChainRequest] =
+    Behaviors.setup[ChainRequest] { ctx =>
+      Behaviors.receiveMessage[ChainRequest] {
         case ApplyTxsToState(txs, parentHash, replyTo) =>
           val (appliedTxs, newUtxoState) = state.applyTxsToUtxoState(txs, parentHash)
           replyTo ! appliedTxs
@@ -49,7 +49,7 @@ object Blockchain {
 
 trait BlockchainLike {
   /** @return current height of blockchain, index of the latest block */
-  def height: Int
+  def height: Long
 
   /** @return true if any branch has formed in blockchain and was not garbage collected yet */
   def isForked: Boolean
@@ -78,7 +78,7 @@ trait BlockchainLike {
    * @param index height
    * @return block or blocks in case chain is currently having equally high competing branches
    */
-  def findByIndex(index: Int): List[Block]
+  def findByIndex(index: Long): List[Block]
 
   /**
    * Find block by its hash

@@ -1,6 +1,5 @@
 package minichain
 
-import minichain.MemPool.Transactions
 import minichain.Miner._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

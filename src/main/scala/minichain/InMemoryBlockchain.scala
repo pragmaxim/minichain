@@ -18,11 +18,11 @@ import scala.util.{Failure, Success, Try}
  * @param utxoStateByHash             UtxoState corresponding to blocks, we need to have multiple instances due to forking
  */
 case class InMemoryBlockchain(
-                               lastGarbageCollectionHeight: Int,
-                               indexCache: SortedMap[Int, List[Block]],
+                               lastGarbageCollectionHeight: Long,
+                               indexCache: SortedMap[Long, List[Block]],
                                hashCache: Map[Hash, BlockTemplate],
                                utxoStateByHash: Map[Hash, UtxoState]) extends BlockchainLike with LazyLogging {
-  def height: Int = indexCache.last._1
+  def height: Long = indexCache.last._1
 
   def isForked: Boolean = indexCache.size == hashCache.size && indexCache.forall(_._2.tails.isEmpty)
 
@@ -86,7 +86,7 @@ case class InMemoryBlockchain(
   }
 
 
-  def findByIndex(index: Int): List[Block] = indexCache.getOrElse(index, List.empty)
+  def findByIndex(index: Long): List[Block] = indexCache.getOrElse(index, List.empty)
 
   def findByHash(hash: Hash): Option[Block] = hashCache.get(hash).map(Block(hash, _))
 
@@ -111,7 +111,7 @@ case class InMemoryBlockchain(
       this
     } else {
       @tailrec
-      def cleanupBranch(newCleanupHeight: Int, childIndex: Int, parentHash: Hash, newBlockChain: InMemoryBlockchain): InMemoryBlockchain = {
+      def cleanupBranch(newCleanupHeight: Long, childIndex: Long, parentHash: Hash, newBlockChain: InMemoryBlockchain): InMemoryBlockchain = {
         val newIndexCache = newBlockChain.indexCache.adjust(childIndex)(_.get.filter(_.hash == parentHash))
         val newHashCache =
           newBlockChain.indexCache(childIndex)
@@ -129,7 +129,7 @@ case class InMemoryBlockchain(
         }
       }
 
-      def findLastSplit: Option[(Int, List[Block])] =
+      def findLastSplit: Option[(Long, List[Block])] =
         indexCache
           .takeRight(Settings.OrphanedForksGarbageCollectionLength)
           .toSeq
@@ -177,7 +177,7 @@ object InMemoryBlockchain extends LazyLogging {
   def fromGenesis: InMemoryBlockchain = {
     new InMemoryBlockchain(
       lastGarbageCollectionHeight = 0,
-      TreeMap(0 -> List(Miner.verifiedGenesisBlock)),
+      TreeMap(0L -> List(Miner.verifiedGenesisBlock)),
       Map(Miner.verifiedGenesisBlock.hash -> Miner.verifiedGenesisBlock.template),
       Map(Miner.verifiedGenesisBlock.hash -> Map(Miner.genesisTx.output -> Miner.genesisTx.value))
     )
