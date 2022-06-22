@@ -2,6 +2,7 @@ package minichain
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, PreRestart}
+import akka.pattern.StatusReply
 import minichain.Blockchain.TxsAppliedToState
 
 import scala.util.{Failure, Success, Try}
@@ -13,7 +14,7 @@ object Blockchain {
 
   case class ApplyTxsToState(txs: IndexedSeq[Transaction], replyTo: ActorRef[TxsAppliedToState]) extends ChainRequest
 
-  case class ApplyBlockToChain(block: Block, replyTo: ActorRef[BlockAppliedToChain]) extends ChainRequest
+  case class ApplyBlockToChain(block: Block, replyTo: ActorRef[StatusReply[Block]]) extends ChainRequest
 
   sealed trait ChainResponse extends Response
 
@@ -32,10 +33,10 @@ object Blockchain {
           ctx.log.info(s"Appending new block at height : ${block.template.index} [ ${block.hash.toNumber} ]")
           state.append(block) match {
             case Success(newState) =>
-              replyTo ! BlockAppliedToChain(block, valid = true)
+              replyTo ! StatusReply.success(block)
               behavior(newState)
             case Failure(ex) =>
-              replyTo ! BlockAppliedToChain(block, valid = false)
+              replyTo ! StatusReply.error(ex)
               ctx.log.error(s"Ignoring invalid block", ex)
               Behaviors.same
           }

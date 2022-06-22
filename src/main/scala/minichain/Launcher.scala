@@ -14,12 +14,13 @@ object Launcher extends App {
       val blockchainRef = ctx.spawn(Blockchain.behavior(InMemoryBlockchain.fromGenesis), "Blockchain")
       val memPoolRef = ctx.spawn(MemPool.behavior(), "MemPool")
 
-      Miner.stream(blockchainRef, memPoolRef).run().zip(Demo.run(memPoolRef))
+      Demo.peerTxSource(memPoolRef).run()
+      Demo.walletTxsSource(memPoolRef).run()
+      Miner.stream(blockchainRef, memPoolRef).run()
       Behaviors.unhandled
     }
 
   val system = ActorSystem[Nothing](guardian, "minichain")
-
 
   Await.result(system.whenTerminated, 10.minutes)
 }

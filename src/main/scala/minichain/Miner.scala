@@ -3,6 +3,7 @@ package minichain
 import akka.actor.Cancellable
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.pattern.StatusReply
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
@@ -17,7 +18,7 @@ import scala.concurrent.duration._
 object Miner extends LazyLogging {
 
   def stream(blockchain: ActorRef[ChainRequest], memPool: ActorRef[PullPoolTxs])
-            (implicit system: ActorSystem[_]): Source[BlockAppliedToChain, Cancellable] = {
+            (implicit system: ActorSystem[_]): Source[StatusReply[Block], Cancellable] = {
     implicit val timeout: Timeout = 3.seconds
     Source.tick(5.seconds, 3.seconds, ())
       .mapAsync(parallelism = 1) { _ =>
